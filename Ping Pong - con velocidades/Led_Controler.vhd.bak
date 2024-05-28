@@ -1,0 +1,462 @@
+LIBRARY ieee;
+USE ieee.std_logic_1164.all;
+USE ieee.numeric_std.all;
+--------------------------------------------
+ENTITY Led_Controler IS
+	GENERIC(	RAM_WITH: INTEGER:= 8);
+	PORT(		--IN
+				clk			:	IN		STD_LOGIC;
+				rst			:	IN		STD_LOGIC;
+				en				:	IN		STD_LOGIC;
+				bu_r1       :	IN		STD_LOGIC;  -- button up- raqueta 1
+				bd_r1       :	IN		STD_LOGIC;  -- button down - raqueta 1
+				bu_r2       :	IN		STD_LOGIC;  -- button up - raqueta 2
+				bd_r2       :	IN		STD_LOGIC;  -- button down raqueta 2
+				syn_clr		: IN STD_LOGIC;
+					----OUT PINs---------------------------
+			PIN_1		   : OUT	STD_LOGIC;
+			PIN_2		   : OUT	STD_LOGIC;
+			PIN_3		   : OUT	STD_LOGIC;
+			PIN_4		   : OUT	STD_LOGIC;
+			PIN_5		   : OUT	STD_LOGIC;
+			PIN_6		   : OUT	STD_LOGIC;
+			PIN_7		   : OUT	STD_LOGIC;
+			PIN_8		   : OUT	STD_LOGIC;
+			PIN_9		   : OUT	STD_LOGIC;
+			PIN_10		: OUT	STD_LOGIC;
+			PIN_11		: OUT	STD_LOGIC;
+			PIN_12		: OUT	STD_LOGIC;
+			PIN_13		: OUT	STD_LOGIC;
+			PIN_14		: OUT	STD_LOGIC;
+			PIN_15		: OUT	STD_LOGIC;
+			PIN_16		: OUT	STD_LOGIC;
+			PIN_17		: OUT	STD_LOGIC;
+			PIN_18		: OUT	STD_LOGIC;
+			PIN_19		: OUT	STD_LOGIC;
+			PIN_20		: OUT	STD_LOGIC;
+			PIN_21		: OUT	STD_LOGIC;
+			PIN_22		: OUT	STD_LOGIC;
+			PIN_23		: OUT	STD_LOGIC;
+			PIN_24		: OUT	STD_LOGIC;
+			PIN_25		: OUT	STD_LOGIC;
+			PIN_26		: OUT	STD_LOGIC;
+			PIN_27		: OUT	STD_LOGIC;
+			PIN_28		: OUT	STD_LOGIC;
+			PIN_29		: OUT	STD_LOGIC;
+			PIN_30		: OUT	STD_LOGIC;
+			PIN_31		: OUT	STD_LOGIC;
+			PIN_32		: OUT	STD_LOGIC;
+			Score_p1		: OUT STD_LOGIC_VECTOR(6 DOWNTO 0);
+			Score_p2		: OUT	STD_LOGIC_VECTOR(6 DOWNTO 0)
+			);
+END ENTITY;
+--------------------------------------------
+ARCHITECTURE structural OF Led_Controler IS
+	--Coneccion de bloques genericos
+	SIGNAL ena_s		  : STD_LOGIC;
+	SIGNAL rd_data_s	  : STD_LOGIC;
+	signal en_timer_s	  : STD_LOGIC;
+	signal rd_addr_s	  : STD_LOGIC_VECTOR(7 DOWNTO 0);
+	--Conecion para vector a RAM
+	signal wr_addr_s    : STD_LOGIC_VECTOR(7 DOWNTO 0);
+	signal wr_data_s	  : STD_LOGIC;
+	signal max_tick_s   : STD_LOGIC;
+	signal max_tick_clk : STD_LOGIC;
+	--Cables vacio del counter
+	signal min_tick_s   : STD_LOGIC;
+	signal coutner_s	  : STD_LOGIC_VECTOR(22 DOWNTO 0);
+	--IMAGEN y posiciones
+	signal image_vect	  :STD_LOGIC_VECTOR(127 DOWNTO 0);
+	signal posx1        : STD_LOGIC_VECTOR (7 DOWNTO 0);  --posicion de la bola
+	signal pos1r1        : STD_LOGIC_VECTOR(7 DOWNTO 0); -- posicion led 1 de raqueta 1
+	signal pos2r1        : STD_LOGIC_VECTOR(7 DOWNTO 0); -- posicion led 2 de raqueta 1
+	signal pos3r1        : STD_LOGIC_VECTOR(7 DOWNTO 0); -- posicion led 3 de raqueta 1
+	signal pos1r2        : STD_LOGIC_VECTOR(7 DOWNTO 0); -- posicion led 1 de raqueta 2
+	signal pos2r2        : STD_LOGIC_VECTOR(7 DOWNTO 0); -- posicion led 2 de raqueta 2
+	signal pos3r2        : STD_LOGIC_VECTOR(7 DOWNTO 0); -- posicion led 3 de raqueta 2
+	--Selector_led 1
+	signal Corner_1      : STD_LOGIC;
+	signal up_wall_1     : STD_LOGIC;
+	signal down_wall_1   : STD_LOGIC;
+	signal left_wall_1   : STD_LOGIC;
+	signal right_wall_1  : STD_LOGIC;
+	signal selector_1    : STD_LOGIC_VECTOR(2 DOWNTO 0);
+	signal mux_exit_1    : STD_LOGIC_VECTOR(7 DOWNTO 0);
+	--Raqueta 1 
+	signal mux_1r1       : STD_LOGIC_VECTOR(7 DOWNTO 0);
+	signal mux_2r1       : STD_LOGIC_VECTOR(7 DOWNTO 0);
+	signal mux_3r1       : STD_LOGIC_VECTOR(7 DOWNTO 0);
+	signal fall_up_r1    : STD_LOGIC;
+	signal fall_down_r1  : STD_LOGIC;
+	signal fall_r1       : STD_LOGIC_VECTOR(1 DOWNTO 0);
+	signal extremos_r1   : STD_LOGIC;
+	signal medio_r1      : STD_LOGIC;
+	signal cup_r1        : STD_LOGIC;
+	signal cdown_r1      : STD_LOGIC;
+	--Raqueta 2 
+	signal mux_1r2       : STD_LOGIC_VECTOR(7 DOWNTO 0);
+	signal mux_2r2       : STD_LOGIC_VECTOR(7 DOWNTO 0);
+	signal mux_3r2       : STD_LOGIC_VECTOR(7 DOWNTO 0);
+	signal fall_up_r2    : STD_LOGIC;
+	signal fall_down_r2  : STD_LOGIC;
+	signal fall_r2       : STD_LOGIC_VECTOR(1 DOWNTO 0);
+	signal extremos_r2   : STD_LOGIC;
+	signal medio_r2      : STD_LOGIC;
+	signal cup_r2        : STD_LOGIC;
+	signal cdown_r2      : STD_LOGIC;
+	---------Reset------------------
+	signal gol_reset     : STD_LOGIC;
+	---------Puntajes----------------
+	signal ena_counter_p1   : STD_LOGIC;
+	signal ena_counter_p2   : STD_LOGIC;
+	signal count_p1         : STD_LOGIC_VECTOR(3 DOWNTO 0);
+	signal count_actual_p1  : STD_LOGIC_VECTOR(3 DOWNTO 0);
+	signal count_p2         : STD_LOGIC_VECTOR(3 DOWNTO 0);
+	signal count_actual_p2  : STD_LOGIC_VECTOR(3 DOWNTO 0);
+	signal max_p1           : STD_LOGIC;
+	signal max_p2           : STD_LOGIC;
+	signal winner           : STD_LOGIC;
+	
+BEGIN
+
+    process (max_p1,max_p2)
+    begin
+        -- Tu código con las asignaciones y lógica aquí
+        IF (max_p1 = '1' OR max_p2 = '1') THEN
+            winner <= '1';
+        ELSE
+            winner <= '0';
+        END IF;
+    end process;
+	 
+	--image_vect <= "00111100000000000100001000011000100110010011110010100101011111101000000111111111101001011111111101000010011001100011110000000000";
+	---------------Bola -------------------------------		
+		arriba_led1: entity work.Comp_lateral_arriba
+	   PORT MAP (    X1            => posx1,
+				        up_wall      => up_wall_1);
+						  
+		abajo_led1: entity work.Comp_lateral_abajo
+	   PORT MAP (    X1          => posx1,
+				        down_wall      => down_wall_1);
+						  
+		izquierda_led1: entity work.Comp_lateral_izq
+	   PORT MAP (    X1          => posx1,
+				        left_wall   => left_wall_1 );
+						
+		derecha_led1: entity work.Comp_lateral_derecha
+	   PORT MAP (    X1           => posx1,
+				        right_wall   => right_wall_1 );
+						  
+		FSM_bouncing: entity work.bounce_sel
+	   PORT MAP (    clk            => clk,
+		              rst            => rst, 
+						  ena            => '1',
+						  ready_timer	  => max_tick_clk,
+						  extremos_r1    => extremos_r1,
+			           extremos_r2    => extremos_r2, 
+						  medio_r1       => medio_r1, 
+						  medio_r2       => medio_r2, 
+						  cup_r1         => cup_r1,
+						  cup_r2         => cup_r2,
+						  cdown_r1       => cdown_r1, 
+						  cdown_r2       => cdown_r2,
+						  left_wall      => left_wall_1,
+						  right_wall     => right_wall_1,
+						  up_wall        => up_wall_1,
+						  down_wall      => down_wall_1,
+						  ena_counter_p1 => ena_counter_p1,
+						  ena_counter_p2 => ena_counter_p2,
+						  gol_reset      => gol_reset,
+				        sel_mux        => selector_1); 
+		
+		Mux_led1: entity work.Mux_posiciones_1
+	   PORT MAP (    selector          => selector_1,
+		              posx_1            => posx1, 
+				        posx_actual_1     => mux_exit_1);
+						  
+		flipflop_led1: entity work.my_dff
+	   PORT MAP (    clk          => max_tick_clk,
+		              rst          => gol_reset, 
+						  rst_win      => winner,
+						  ena          => '1',
+						  d            => mux_exit_1,
+				        q            => posx1);		
+						  
+	----------------------RAQUETA 1------------------------------------
+	   
+	   button_up_r1: entity work.edge_detect
+	   PORT MAP (clk        => max_tick_clk,
+				    async_sig  => bu_r1,
+				    rise       => open,
+				    fall       => fall_up_r1);
+	  
+	   button_down_r1: entity work.edge_detect
+	   PORT MAP (clk        => max_tick_clk,
+				    async_sig  => bd_r1	,
+				    rise       => open,
+				    fall       => fall_down_r1);
+					 
+		fall_r1 <= fall_up_r1 & fall_down_r1;
+		
+		extremos_raqueta_1: entity work.Comp_extremos_r1
+	   PORT MAP (    bola             => posx1,
+		              raqueta          => pos1r1,
+				        extremos_r1      => extremos_r1);
+					
+		Medio_raqueta_1: entity work.Comp_medio_r1
+	   PORT MAP (    bola             => posx1,
+		              raqueta          => pos2r1,
+				        medio_r1         => medio_r1);
+						  
+	   Corner_up_raqueta_1: entity work.Comp_corner_up_r1
+	   PORT MAP (    bola             => posx1,
+		              raqueta          => pos1r1,
+				        cup_r1           => cup_r1);
+						  
+		Corner_down_raqueta_1: entity work.Comp_corner_down_r1
+	   PORT MAP (    bola             => posx1,
+		              raqueta          => pos3r1,
+				        cdown_r1          => cdown_r1);
+						  
+		Mux_1raquet1: entity work.Mux_posiciones_raquets
+	   PORT MAP (    selector          => fall_r1,
+		              posx_r            => pos1r1, 
+				        posx_actual_r     => mux_1r1);
+						  
+		Mux_2raquet1: entity work.Mux_posiciones_raquets
+	   PORT MAP (    selector          => fall_r1,
+		              posx_r            => pos2r1, 
+				        posx_actual_r     => mux_2r1);
+						  
+		Mux_3raquet1: entity work.Mux_posiciones_raquets
+	   PORT MAP (    selector          => fall_r1,
+		              posx_r            => pos3r1, 
+				        posx_actual_r     => mux_3r1);
+					 
+	   flipflop_led1r1: entity work.flip_flop_1r1
+	   PORT MAP (    clk          => max_tick_clk,
+		              rst          => rst,
+						  rst_win      => winner, 
+						  ena          => '1',
+						  d            => mux_1r1,
+				        q            => pos1r1);
+						  
+	  flipflop_led2r1: entity work.flip_flop_2r1
+	   PORT MAP (    clk          => max_tick_clk,
+		              rst          => rst, 
+						  rst_win      => winner,
+						  ena          => '1',
+						  d            => mux_2r1,
+				        q            => pos2r1);
+						  
+	   flipflop_led3r1: entity work.flip_flop_3r1
+	   PORT MAP (    clk          => max_tick_clk,
+		              rst          => rst,
+						  rst_win      => winner, 
+						  ena          => '1',
+						  d            => mux_3r1,
+				        q            => pos3r1);
+						  
+		----------------------RAQUETA 2------------------------------------
+	   
+	   button_up_r2: entity work.edge_detect
+	   PORT MAP (clk        => max_tick_clk,
+				    async_sig  => bu_r2,
+				    rise       => open,
+				    fall       => fall_up_r2);
+	  
+	   button_down_r2: entity work.edge_detect
+	   PORT MAP (clk        => max_tick_clk,
+				    async_sig  => bd_r2	,
+				    rise       => open,
+				    fall       => fall_down_r2);
+					 
+		fall_r2 <= fall_up_r2 & fall_down_r2;
+		
+		extremos_raqueta_2: entity work.Comp_extremos_r2
+	   PORT MAP (    bola             => posx1,
+		              raqueta          => pos1r2,
+				        extremos_r2      => extremos_r2);
+					
+		Medio_raqueta_2: entity work.Comp_medio_r2
+	   PORT MAP (    bola             => posx1,
+		              raqueta          => pos2r2,
+				        medio_r2         => medio_r2);
+						  
+	   Corner_up_raqueta_2: entity work.Comp_corner_up_r2
+	   PORT MAP (    bola             => posx1,
+		              raqueta          => pos1r2,
+				        cup_r2           => cup_r2);
+						  
+		Corner_down_raqueta_2: entity work.Comp_corner_down_r2
+	   PORT MAP (    bola             => posx1,
+		              raqueta          => pos3r2,
+				        cdown_r2          => cdown_r2);
+		
+		Mux_1raquet2: entity work.Mux_posiciones_raquets
+	   PORT MAP (    selector          => fall_r2,
+		              posx_r            => pos1r2, 
+				        posx_actual_r     => mux_1r2);
+						  
+		Mux_2raquet2: entity work.Mux_posiciones_raquets
+	   PORT MAP (    selector          => fall_r2,
+		              posx_r            => pos2r2, 
+				        posx_actual_r     => mux_2r2);
+						  
+		Mux_3raquet2: entity work.Mux_posiciones_raquets
+	   PORT MAP (    selector          => fall_r2,
+		              posx_r            => pos3r2, 
+				        posx_actual_r     => mux_3r2);
+					 
+	   flipflop_led1r2: entity work.flip_flop_1r2
+	   PORT MAP (    clk          => max_tick_clk,
+		              rst          => rst, 
+						  rst_win      => winner,
+						  ena          => '1',
+						  d            => mux_1r2,
+				        q            => pos1r2);
+						  
+	   flipflop_led2r2: entity work.flip_flop_2r2
+	   PORT MAP (    clk          => max_tick_clk,
+		              rst          => rst, 
+						  rst_win      => winner,
+						  ena          => '1',
+						  d            => mux_2r2,
+				        q            => pos2r2);
+						  
+	   flipflop_led3r2: entity work.flip_flop_3r2
+	   PORT MAP (    clk          => max_tick_clk,
+		              rst          => rst,
+						  rst_win      => winner, 
+						  ena          => '1',
+						  d            => mux_3r2,
+				        q            => pos3r2);
+						  
+	----------------------contador para la impresion-------------------	
+	
+	control_counter: entity work.control_counter
+	GENERIC MAP (N => 23)
+	   PORT MAP (clk             => clk,
+				    rst             => rst,
+					 ena             => '1',
+					 syn_clr         => syn_clr,
+					 load            => '0',
+					 up              => '1',
+					 d               => "10011110111111110010000",
+				    num_max         => "00000000001001110001000",
+					 max_tick        => max_tick_S,
+				    min_tick        => min_tick_s,
+					 counter         => coutner_s);
+	
+	----------------contador de los 7 millones-------------------	
+	
+	contador_lectura:	ENTITY work.control_counter
+		GENERIC MAP (N => 23)
+		PORT MAP		(	clk			  =>	clk,
+							rst		     =>	rst,
+							ena		     =>	'1',
+							syn_clr		  =>	'0',
+							load		     =>	'0',
+							up		        =>	'1',
+							d		        =>	"00000000000000000000000",
+							num_max		  =>	"11010101100111111000000", -- 7 MILLONES
+							max_tick      =>  max_tick_clk,
+					      min_tick      =>  open ,
+							counter		  =>	open);
+			
+	------------------------Scores---------------------------------
+	   Mux_contador_player1: entity work.Mux_contador_p1_2
+	   PORT MAP (    selector              => ena_counter_p1,
+		              count_p1_2            => count_p1, 
+				        count_actual_p1_2     => count_actual_p1);
+						  
+		Mux_contador_player2: entity work.Mux_contador_p1_2
+	   PORT MAP (    selector              => ena_counter_p2,
+		              count_p1_2            => count_p2, 
+				        count_actual_p1_2     => count_actual_p2);
+						  
+	   flipflop_player1: entity work.flip_flop_scores
+	   PORT MAP (    clk          => max_tick_clk,
+		              rst          => rst, 
+						  rst_win      => winner,
+						  ena          => '1',
+					     d            => count_actual_p1,
+				        q            => count_p1);
+						  
+	   flipflop_player2: entity work.flip_flop_scores
+	   PORT MAP (    clk          => max_tick_clk,
+		              rst          => rst, 
+						  rst_win      => winner,
+						  ena          => '1',
+				   	  d            => count_actual_p2,
+				        q            => count_p2);
+						  
+		Max_puntaje_player_1: entity work.Comparador_9
+	   PORT MAP (    counter          => count_p1,
+				        Flag             => max_p1);
+						  
+		Max_puntaje_player_2: entity work.Comparador_9
+	   PORT MAP (    counter          => count_p2,
+				        Flag             => max_p2);	
+						  
+		Puntaje_player1: ENTITY WORK.bin_to_sseg
+      PORT MAP(  bin  => count_p1,
+                 sseg => Score_p1); 
+				  
+	   Puntaje_player2: ENTITY WORK.bin_to_sseg
+      PORT MAP(  bin  => count_p2,
+                 sseg => Score_p2); 
+					  
+		
+							
+    ------------Impresion------------------------------------------
+	 led_machine : entity work.led_machine
+		PORT MAP(		clk			=>	clk, 
+							rst			=>	rst,
+							ena			=>	en, 
+							pos_actual_1 => posx1,
+							pos_actual_2 => pos1r1,
+							pos_actual_3 => pos2r1,
+							pos_actual_4 => pos3r1,
+							pos_actual_5 => pos1r2,
+							pos_actual_6 => pos2r2,
+							pos_actual_7 => pos3r2,
+							--led_state	=>	rd_data_s,
+							ready_timer	=>	max_tick_S,
+							--rd_addr		=>	rd_addr_s,
+							en_timer		=>	ena_s,
+							PIN_1 => PIN_1,						
+							PIN_2 => PIN_2,
+							PIN_3 => PIN_3,
+							PIN_4 => PIN_4,
+							PIN_5 => PIN_5,
+							PIN_6 => PIN_6,
+							PIN_7 => PIN_7,
+							PIN_8 => PIN_8,
+							PIN_9 => PIN_9,
+							PIN_10 => PIN_10,
+							PIN_11 => PIN_11,
+							PIN_12 => PIN_12,
+							PIN_13 => PIN_13,
+							PIN_14 => PIN_14,
+							PIN_15 => PIN_15,
+							PIN_16 => PIN_16,
+							PIN_17 => PIN_17,
+							PIN_18 => PIN_18,
+							PIN_19 => PIN_19,
+							PIN_20 => PIN_20,
+							PIN_21 => PIN_21,
+							PIN_22 => PIN_22,
+							PIN_23 => PIN_23,
+							PIN_24 => PIN_24,
+							PIN_25 => PIN_25,
+							PIN_26 => PIN_26,
+							PIN_27 => PIN_27,
+							PIN_28 => PIN_28,
+							PIN_29 => PIN_29,
+							PIN_30 => PIN_30,
+							PIN_31 => PIN_31,
+							PIN_32 => PIN_32);
+		
+END ARCHITECTURE;
+----------------------------------------------
